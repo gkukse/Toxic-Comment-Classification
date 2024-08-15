@@ -1,0 +1,13 @@
+# Ignore Python bytecode
+*.pyc
+__pycache__/
+
+
+# Ignore Archive folder and its contents
+Archive/
+lightning_logs/
+checkpoints/
+tb_logs/
+
+# Ignore log files
+*.log
