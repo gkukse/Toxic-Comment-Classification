@@ -1,13 +1,14 @@
 import os
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import statsmodels.api as sm
+import re
+from urllib.parse import urlparse
 
-from sklearn.metrics import (accuracy_score, confusion_matrix,
-                             precision_score, recall_score
-                             )
+import inspect
+
+import nltk
+nltk.download('stopwords')
+
+from nltk.corpus import stopwords
 
 
 pd.plotting.register_matplotlib_converters()
@@ -48,37 +49,84 @@ def first_look(df: pd.DataFrame) -> None:
     return info_df.T
 
 
-def distribution_check(df: pd.DataFrame) -> None:
-    """Box plot graph for identifying numeric column outliers, normality of distribution."""
-    df = df.reset_index(drop=True)
 
-    for feature in df.columns:
+def replace_url_with_domain(text):
+    # Regular expression to find URLs
+    url_pattern = r'https?://[^\s]+'
+    
+    def extract_domain(url):
+        try:
+            parsed_url = urlparse(url)
+            domain = parsed_url.netloc
+            
+            # Remove 'www.' if present
+            if domain.startswith('www.'):
+                domain = domain[4:]
+                
+            # Split domain and remove common TLDs
+            domain_parts = domain.split('.')
+            if len(domain_parts) > 1:
+                # Remove the last part (TLD)
+                domain = '.'.join(domain_parts[:-1])
+                
+            return domain
+        except Exception as e:
+            return url
+    
+    # Find all URLs in the text
+    urls = re.findall(url_pattern, text)
+    
+    # Replace each URL with its domain name
+    for url in urls:
+        domain = extract_domain(url)
+        text = text.replace(url, domain)
+    
+    return text
 
-        if df[feature].dtype.name in ['object', 'bool']:
-            pass
 
-        else:
+def replace_filenames(text):
 
-            fig, axes = plt.subplots(1, 3, figsize=(12, 3))
-
-            print(f'{feature}')
-
-            df.boxplot(column=feature, ax=axes[0])
-            axes[0].set_title(
-                f'{feature} ranges from {df[feature].min()} to {df[feature].max()}')
-
-            sns.histplot(data=df, x=feature, kde=True, bins=20, ax=axes[1])
-            axes[1].set_title(f'Distribution of {feature}')
-
-            sm.qqplot(df[feature].dropna(), line='s', ax=axes[2])
-            axes[2].set_title(f'Q-Q plot of {feature}')
-
-            plt.tight_layout()
-            plt.show()
+    def replace_match(match):
+        return match.group(1)
+    
+    # Replace the filenames in the text using re.sub
+    replaced_text = re.sub(r'File:([A-Za-z0-9_]+)\.(jpg|jpeg|png|gif)', replace_match, text)
+    replaced_text = re.sub(r'([A-Za-z0-9_]+)\.(jpg|jpeg|png|gif)', replace_match, text)
+    
+    return replaced_text
 
 
-def contains_non_english(text):
-    for char in text:
-        if ord(char) > 127:  # Non-ASCII character
-            return True
-    return False
+
+def clean_text(text):
+    # Convert to lowercase
+    text = text.lower()
+    # Remove special characters, numbers, and punctuation
+    text = re.sub(r'[^a-z\s]', '', text)
+    # Remove extra spaces
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+
+
+def remove_stopwords(text):
+    stop_words = set(stopwords.words('english'))
+    return ' '.join([word for word in text.split() if word not in stop_words])
+
+def remove_non_ascii(text):
+    return ''.join([char for char in text if ord(char) <= 127])
+
+
+def retrieve_name(var):
+    callers_local_vars = inspect.currentframe().f_back.f_locals.items()
+    return [var_name for var_name, var_val in callers_local_vars if var_val is var][0]
+
+
+def model_dataset_distribution(original_df, X_train, X_val, X_test):
+    df  = pd.DataFrame()
+    for i in [X_train, X_val, X_test]:
+        df1 = (original_df[original_df['id'].isin(i['id'])].drop(columns=['id', 'comment_text']).sum() / original_df[original_df['id'].isin(i['id'])].shape[0] * 100).round(1).to_frame().reset_index().rename(columns={'index': 'Type', 0: 'Proc'})
+        df1['Dataset'] = retrieve_name(i)
+        df = pd.concat([df1, df], ignore_index=True, sort=False)
+    
+    return df
