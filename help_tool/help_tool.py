@@ -122,9 +122,11 @@ def retrieve_name(var):
     return [var_name for var_name, var_val in callers_local_vars if var_val is var][0]
 
 
-def model_dataset_distribution(original_df, X_train, X_val, X_test):
+def model_dataset_distribution(original_df, X_train, X_val#, X_test
+                               ):
     df  = pd.DataFrame()
-    for i in [X_train, X_val, X_test]:
+    for i in [X_train, X_val#, X_test
+              ]:
         df1 = (original_df[original_df['id'].isin(i['id'])].drop(columns=['id', 'comment_text']).sum() / original_df[original_df['id'].isin(i['id'])].shape[0] * 100).round(1).to_frame().reset_index().rename(columns={'index': 'Type', 0: 'Proc'})
         df1['Dataset'] = retrieve_name(i)
         df = pd.concat([df1, df], ignore_index=True, sort=False)
